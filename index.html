@@ -251,9 +251,44 @@
     color:var(--gold-dim);
     margin-top:2px;
   }
+  .flavor{
+    font-size:12.5px;
+    color:var(--gold-dim);
+    opacity:.8;
+    font-style:italic;
+    max-width:340px;
+    margin:0 0 18px;
+    line-height:1.5;
+  }
+  .dedication{
+    font-size:11.5px;
+    color:rgba(243,230,207,0.45);
+    max-width:340px;
+    margin-top:10px;
+    line-height:1.5;
+    letter-spacing:0.3px;
+  }
+  #mute-btn{
+    position:fixed;
+    top:14px;
+    right:14px;
+    z-index:50;
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    border:1px solid rgba(232,200,116,0.35);
+    background:rgba(15,12,31,0.55);
+    color:var(--gold);
+    font-size:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+  }
 </style>
 </head>
 <body>
+<button id="mute-btn" onclick="toggleMute()">🔊</button>
 <div id="app">
 
   <!-- START -->
@@ -263,8 +298,9 @@
     <h1 class="title">Quest of the<br>Wyrmwood Egg</h1>
     <p class="subtitle">Somewhere deep in the Wyrmwood, an ancient egg is about to hatch &mdash; and it holds a secret only the bravest can uncover. Gather the sparks, cross the crystal cave, and face the guardian dragon to find out who's joining the family.</p>
     <div class="rune-divider"></div>
-    <button class="btn big" onclick="goTo('screen-l1-intro')">Begin the Quest</button>
-    <div class="fine-print">best played on a phone &middot; tap to play</div>
+    <button class="btn big" onclick="initAudio(); goTo('screen-l1-intro')">Begin the Quest</button>
+    <p class="dedication">For Astraea, Atreus, and Isha &mdash; and the newest little cousin about to join the crew.</p>
+    <div class="fine-print">best played on a phone, with sound on &middot; tap to play</div>
   </div>
 
   <!-- LEVEL 1 INTRO -->
@@ -273,6 +309,7 @@
     <div class="badge">Act One</div>
     <h1 class="title" style="font-size:clamp(22px,6vw,30px)">The Whispering Grove</h1>
     <p class="subtitle">Ten wishing sparks are hiding among the trees. Tap each one to gather its light before they drift away.</p>
+    <p class="flavor">Astraea swears the sparks giggle if you catch them fast enough. Nobody has proven her wrong yet.</p>
     <button class="btn big" onclick="startLevel1()">Enter the Grove</button>
   </div>
 
@@ -300,6 +337,7 @@
     <div class="badge">Act Two</div>
     <h1 class="title" style="font-size:clamp(22px,6vw,30px)">The Crystal Cave</h1>
     <p class="subtitle">Loose shards tumble from the ceiling. Tap 10 of them mid-air to clear a path deeper into the mountain.</p>
+    <p class="flavor">Atreus once tried to eat a shard just like these. He's 1&frac12; and fearless &mdash; try to do better.</p>
     <button class="btn big" onclick="startLevel2()">Enter the Cave</button>
   </div>
 
@@ -327,6 +365,7 @@
     <div class="badge">Final Act</div>
     <h1 class="title" style="font-size:clamp(22px,6vw,30px)">The Guardian Dragon</h1>
     <p class="subtitle">Only by proving your courage will the guardian let the egg's secret be known. Tap the dragon to earn its respect!</p>
+    <p class="flavor">Isha's advice: dragons only breathe fire if you blink first. So &mdash; don't blink.</p>
     <div style="font-size:70px; margin:6px 0 10px;">🐉</div>
     <button class="btn big ember" onclick="startBoss()">Begin the Trial</button>
   </div>
@@ -350,13 +389,127 @@
     <div class="egg" id="reveal-egg">🥚</div>
     <div id="reveal-content" style="opacity:0; transition:opacity .6s ease;">
       <div class="reveal-text">IT'S A GIRL! 🎀</div>
-      <p class="reveal-sub">The Wyrmwood egg has hatched its secret at last &mdash; a little dragon princess is on her way to join the family.</p>
+      <p class="reveal-sub">The Wyrmwood egg has hatched its secret at last &mdash; a little dragon princess is on her way. Astraea, Atreus, and Isha are getting a brand new cousin!</p>
     </div>
   </div>
 
 </div>
 
 <script>
+/* ================= AUDIO ENGINE ================= */
+let audioCtx = null;
+let masterGain = null;
+let musicToken = 0;
+let muted = false;
+
+function initAudio(){
+  if(audioCtx) return;
+  try{
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.45;
+    masterGain.connect(audioCtx.destination);
+  }catch(e){ audioCtx = null; }
+}
+
+function ensureRunning(){
+  if(audioCtx && audioCtx.state === 'suspended'){
+    audioCtx.resume();
+  }
+}
+
+function toggleMute(){
+  muted = !muted;
+  document.getElementById('mute-btn').textContent = muted ? '🔇' : '🔊';
+  if(masterGain && audioCtx){
+    masterGain.gain.setValueAtTime(muted ? 0 : 0.45, audioCtx.currentTime);
+  }
+}
+
+function playTone(freq, startTime, dur, type, peakVol){
+  if(!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startTime);
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.linearRampToValueAtTime(peakVol, startTime + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.0008, startTime + dur);
+  osc.connect(gain);
+  gain.connect(masterGain);
+  osc.start(startTime);
+  osc.stop(startTime + dur + 0.05);
+}
+
+function playSfx(kind){
+  if(!audioCtx) return;
+  ensureRunning();
+  const t = audioCtx.currentTime;
+  if(kind === 'spark') playTone(1046.5, t, 0.16, 'sine', 0.14);
+  if(kind === 'shard') playTone(880, t, 0.14, 'triangle', 0.12);
+  if(kind === 'hit'){
+    playTone(146.83, t, 0.1, 'square', 0.07);
+    playTone(196, t+0.02, 0.08, 'square', 0.05);
+  }
+  if(kind === 'crack') playTone(110, t, 0.3, 'sawtooth', 0.1);
+}
+
+function playMelodyLoop(sequence, bpm, type, vol, token){
+  if(!audioCtx) return;
+  const beatDur = 60 / bpm;
+  let t = audioCtx.currentTime + 0.05;
+  sequence.forEach(([freq, beats])=>{
+    if(freq > 0) playTone(freq, t, beatDur * beats * 0.92, type, vol);
+    t += beatDur * beats;
+  });
+  const totalDur = sequence.reduce((s,[,b])=>s+b, 0) * beatDur;
+  setTimeout(()=>{
+    if(token === musicToken){
+      playMelodyLoop(sequence, bpm, type, vol, token);
+    }
+  }, totalDur * 1000);
+}
+
+const FOREST_SEQ = [
+  [523.25,1],[659.25,1],[783.99,1],[659.25,1],[587.33,1],[523.25,1],[440.00,1],[523.25,2],
+  [392.00,1],[440.00,1],[523.25,1],[440.00,1],[392.00,1],[329.63,1],[293.66,1],[329.63,2]
+];
+const CAVE_SEQ = [
+  [220.00,1.5],[261.63,1],[293.66,1.5],[261.63,1],[220.00,2],
+  [196.00,1.5],[220.00,1],[261.63,1.5],[220.00,1],[196.00,2]
+];
+const BOSS_SEQ = [
+  [329.63,0.5],[329.63,0.5],[392.00,0.5],[329.63,0.5],[293.66,0.5],[293.66,0.5],[349.23,0.5],[293.66,0.5],
+  [329.63,0.5],[329.63,0.5],[392.00,0.5],[440.00,0.5],[466.16,1],[392.00,1]
+];
+
+function startTrack(name){
+  if(!audioCtx) return;
+  ensureRunning();
+  musicToken++;
+  const token = musicToken;
+  const tracks = {
+    forest: {seq: FOREST_SEQ, bpm: 96,  type: 'sine',     vol: 0.10},
+    cave:   {seq: CAVE_SEQ,   bpm: 88,  type: 'triangle', vol: 0.09},
+    boss:   {seq: BOSS_SEQ,   bpm: 132, type: 'sawtooth', vol: 0.055}
+  };
+  const tr = tracks[name];
+  if(tr) playMelodyLoop(tr.seq, tr.bpm, tr.type, tr.vol, token);
+}
+
+function playVictoryFanfare(){
+  if(!audioCtx) return;
+  ensureRunning();
+  musicToken++; // stop any looping track
+  const t0 = audioCtx.currentTime + 0.05;
+  const run = [523.25, 659.25, 783.99, 1046.50];
+  run.forEach((f,i)=> playTone(f, t0 + i*0.18, 0.5, 'sine', 0.16));
+  playTone(783.99,  t0 + 0.85, 1.8, 'sine', 0.09);
+  playTone(1046.50, t0 + 0.85, 1.8, 'sine', 0.11);
+  playTone(1318.51, t0 + 0.85, 1.8, 'sine', 0.08);
+}
+/* ================= END AUDIO ENGINE ================= */
+
 function goTo(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -387,6 +540,7 @@ function startLevel1(){
   const field = document.getElementById('l1-field');
   field.innerHTML = '';
   goTo('screen-l1-play');
+  startTrack('forest');
   spawnSpark();
 }
 
@@ -405,6 +559,7 @@ function spawnSpark(){
   el.onclick = function(){
     if(el.classList.contains('pop')) return;
     el.classList.add('pop');
+    playSfx('spark');
     l1count++;
     document.getElementById('l1-count').textContent = l1count;
     setTimeout(()=>el.remove(), 280);
@@ -429,6 +584,7 @@ function startLevel2(){
   const field = document.getElementById('l2-field');
   field.innerHTML = '';
   goTo('screen-l2-play');
+  startTrack('cave');
   if(l2Timer) clearInterval(l2Timer);
   l2Timer = setInterval(spawnShard, 750);
   spawnShard();
@@ -450,6 +606,7 @@ function spawnShard(){
   el.onclick = function(){
     if(el.classList.contains('pop')) return;
     el.classList.add('pop');
+    playSfx('shard');
     l2count++;
     document.getElementById('l2-count').textContent = l2count;
     setTimeout(()=>{ if(el.parentNode) el.remove(); }, 260);
@@ -470,6 +627,7 @@ function startBoss(){
   document.getElementById('hpfill').style.width = '100%';
   document.getElementById('boss-hint').textContent = 'tap the dragon';
   goTo('screen-boss-fight');
+  startTrack('boss');
 }
 
 function hitDragon(){
@@ -477,6 +635,7 @@ function hitDragon(){
   bossHP = Math.max(0, bossHP-1);
   const pct = (bossHP/BOSS_MAX*100);
   document.getElementById('hpfill').style.width = pct+'%';
+  playSfx('hit');
   const d = document.getElementById('dragon');
   d.classList.remove('hit'); void d.offsetWidth; d.classList.add('hit');
   setTimeout(()=>d.classList.remove('hit'), 100);
@@ -502,10 +661,12 @@ function showReveal(){
   const egg = document.getElementById('reveal-egg');
   setTimeout(()=>{
     egg.classList.add('shake');
+    playSfx('crack');
     setTimeout(()=>{
       egg.textContent = '🎀';
       egg.style.transform = 'scale(1.15)';
       document.getElementById('reveal-content').style.opacity = '1';
+      playVictoryFanfare();
       launchConfetti();
     }, 550);
   }, 400);
