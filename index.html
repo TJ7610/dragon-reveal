@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Quest of the Wyrmwood Egg</title>
+<style>
+  :root{
+    --ink: #0f0c1f;
+    --night1: #14102b;
+    --night2: #2a1e52;
+    --gold: #e8c874;
+    --gold-dim: #b89a54;
+    --ember: #ff7a45;
+    --ember-dark: #c1432a;
+    --crystal: #5ec6d6;
+    --crystal-deep: #2b6f80;
+    --parchment: #f3e6cf;
+    --pink: #ff8fb3;
+    --pink-light: #ffd6e4;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:Georgia,'Palatino Linotype','Times New Roman',serif;
+    background:var(--ink);
+    color:var(--parchment);
+    overflow:hidden;
+    touch-action:manipulation;
+  }
+  #app{
+    position:relative;
+    width:100vw;
+    height:100vh;
+    min-height:100dvh;
+    overflow:hidden;
+  }
+  .screen{
+    position:absolute;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    text-align:center;
+  }
+  .screen.active{display:flex;}
+
+  /* backgrounds per act */
+  .bg-forest{background:
+    radial-gradient(ellipse at 20% 20%, rgba(232,200,116,0.10), transparent 45%),
+    radial-gradient(ellipse at 80% 80%, rgba(94,198,214,0.10), transparent 50%),
+    linear-gradient(180deg, var(--night1) 0%, var(--night2) 60%, #1b1338 100%);}
+  .bg-cave{background:
+    radial-gradient(ellipse at 50% 0%, rgba(94,198,214,0.16), transparent 55%),
+    linear-gradient(180deg, #0c1224 0%, #182848 55%, #0c1224 100%);}
+  .bg-lair{background:
+    radial-gradient(ellipse at 50% 20%, rgba(255,122,69,0.22), transparent 55%),
+    linear-gradient(180deg, #1a0d0d 0%, #2b1010 55%, #150808 100%);}
+  .bg-reveal{background:
+    radial-gradient(ellipse at 50% 40%, rgba(255,143,179,0.35), transparent 60%),
+    linear-gradient(180deg, #2a1533 0%, #170c22 100%);}
+
+  .stars{position:absolute; inset:0; pointer-events:none;}
+  .star{position:absolute; width:2px; height:2px; background:var(--gold); border-radius:50%; opacity:.7; animation:twinkle 2.6s ease-in-out infinite;}
+  @keyframes twinkle{0%,100%{opacity:.15} 50%{opacity:.9}}
+
+  h1.title{
+    font-size:clamp(26px,7vw,40px);
+    letter-spacing:1.5px;
+    margin:0 0 6px;
+    color:var(--gold);
+    text-shadow:0 0 18px rgba(232,200,116,0.35);
+  }
+  .subtitle{
+    font-size:clamp(13px,3.6vw,16px);
+    color:var(--parchment);
+    opacity:.85;
+    max-width:420px;
+    line-height:1.5;
+    margin:0 0 22px;
+  }
+  .rune-divider{
+    width:60px; height:2px;
+    background:linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin:14px auto 18px;
+  }
+
+  .btn{
+    font-family:inherit;
+    font-size:clamp(15px,4vw,18px);
+    letter-spacing:0.5px;
+    padding:14px 34px;
+    border-radius:999px;
+    border:1px solid var(--gold-dim);
+    background:linear-gradient(180deg, rgba(232,200,116,0.16), rgba(232,200,116,0.05));
+    color:var(--gold);
+    cursor:pointer;
+    box-shadow:0 4px 18px rgba(0,0,0,0.35);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:active{transform:scale(0.95);}
+  .btn.big{padding:16px 42px; font-size:clamp(17px,4.6vw,20px);}
+  .btn.ember{border-color:var(--ember); color:#ffdcc7; background:linear-gradient(180deg, rgba(255,122,69,0.22), rgba(255,122,69,0.06));}
+
+  /* progress dots */
+  .progress{
+    position:absolute; top:18px; left:0; right:0;
+    display:flex; justify-content:center; gap:10px;
+    z-index:5;
+  }
+  .dot{width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.25); transition:all .3s ease;}
+  .dot.done{background:var(--gold); border-color:var(--gold); box-shadow:0 0 8px rgba(232,200,116,0.7);}
+  .dot.current{background:transparent; border-color:var(--gold); width:22px; border-radius:5px;}
+
+  .badge{
+    font-size:12px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--gold-dim); margin-bottom:8px;
+  }
+
+  /* play area */
+  .playfield{
+    position:relative;
+    width:100%;
+    max-width:480px;
+    height:52vh;
+    min-height:320px;
+    margin:10px 0 18px;
+    border-radius:18px;
+    border:1px solid rgba(232,200,116,0.25);
+    overflow:hidden;
+    background:rgba(0,0,0,0.18);
+  }
+  .counter{
+    font-size:15px; color:var(--parchment); opacity:.9; margin-bottom:4px; letter-spacing:0.5px;
+  }
+  .counter b{color:var(--gold);}
+
+  .spark{
+    position:absolute;
+    width:38px; height:38px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:24px;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(232,200,116,0.35), transparent 70%);
+    cursor:pointer;
+    animation:floaty 2.4s ease-in-out infinite;
+    filter:drop-shadow(0 0 6px rgba(232,200,116,0.6));
+  }
+  @keyframes floaty{0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)}}
+  .spark.pop{animation:none; transform:scale(1.8); opacity:0; transition:all .28s ease;}
+
+  .shard{
+    position:absolute;
+    width:34px; height:34px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:24px;
+    cursor:pointer;
+    filter:drop-shadow(0 0 6px rgba(94,198,214,0.7));
+    animation-name:fall;
+    animation-timing-function:linear;
+  }
+  @keyframes fall{
+    from{transform:translateY(-40px);}
+    to{transform:translateY(calc(52vh + 40px));}
+  }
+  .shard.pop{animation:none !important; transform:scale(1.8) !important; opacity:0; transition:all .25s ease;}
+
+  /* boss */
+  .dragon-wrap{position:relative; margin:6px 0 14px;}
+  #dragon{
+    font-size:min(26vw,140px);
+    display:inline-block;
+    cursor:pointer;
+    transition:transform .08s ease;
+    filter:drop-shadow(0 0 22px rgba(255,122,69,0.45));
+  }
+  #dragon.hit{transform:scale(0.88) rotate(-3deg);}
+  .hpbar-wrap{
+    width:min(80vw,340px);
+    height:16px;
+    border-radius:999px;
+    border:1px solid var(--ember);
+    background:rgba(0,0,0,0.35);
+    overflow:hidden;
+    margin:6px 0 4px;
+  }
+  #hpfill{
+    height:100%;
+    width:100%;
+    background:linear-gradient(90deg, var(--ember), #ffb26b);
+    transition:width .18s ease;
+  }
+  .fire-flash{
+    position:absolute; inset:0;
+    background:rgba(255,90,40,0.0);
+    pointer-events:none;
+    transition:background .12s ease;
+  }
+
+  /* reveal */
+  .egg{
+    font-size:min(30vw,150px);
+    display:inline-block;
+    transition:transform .15s ease;
+  }
+  .egg.shake{animation:eggshake .5s ease-in-out;}
+  @keyframes eggshake{
+    0%,100%{transform:rotate(0deg);}
+    20%{transform:rotate(-8deg);}
+    40%{transform:rotate(7deg);}
+    60%{transform:rotate(-6deg);}
+    80%{transform:rotate(5deg);}
+  }
+  .reveal-text{
+    font-size:clamp(34px,10vw,64px);
+    color:var(--pink);
+    text-shadow:0 0 26px rgba(255,143,179,0.6);
+    margin:14px 0 4px;
+    letter-spacing:1px;
+  }
+  .reveal-sub{
+    font-size:clamp(14px,3.8vw,17px);
+    color:var(--pink-light);
+    opacity:.9;
+    max-width:380px;
+    line-height:1.6;
+  }
+
+  .confetti{
+    position:absolute; top:-20px;
+    width:9px; height:14px;
+    opacity:0.95;
+    animation-name:confetti-fall;
+    animation-timing-function:linear;
+  }
+  @keyframes confetti-fall{
+    0%{transform:translateY(0) rotate(0deg);}
+    100%{transform:translateY(110vh) rotate(540deg);}
+  }
+
+  .fine-print{
+    position:absolute; bottom:14px; left:0; right:0;
+    text-align:center; font-size:11px; color:rgba(243,230,207,0.4); letter-spacing:0.5px;
+  }
+
+  .hint{
+    font-size:13px;
+    color:var(--gold-dim);
+    margin-top:2px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- START -->
+  <div class="screen active bg-forest" id="screen-start">
+    <div class="stars" id="stars-start"></div>
+    <div class="badge">A Family Quest</div>
+    <h1 class="title">Quest of the<br>Wyrmwood Egg</h1>
+    <p class="subtitle">Somewhere deep in the Wyrmwood, an ancient egg is about to hatch &mdash; and it holds a secret only the bravest can uncover. Gather the sparks, cross the crystal cave, and face the guardian dragon to find out who's joining the family.</p>
+    <div class="rune-divider"></div>
+    <button class="btn big" onclick="goTo('screen-l1-intro')">Begin the Quest</button>
+    <div class="fine-print">best played on a phone &middot; tap to play</div>
+  </div>
+
+  <!-- LEVEL 1 INTRO -->
+  <div class="screen bg-forest" id="screen-l1-intro">
+    <div class="progress"><div class="dot current"></div><div class="dot"></div><div class="dot"></div></div>
+    <div class="badge">Act One</div>
+    <h1 class="title" style="font-size:clamp(22px,6vw,30px)">The Whispering Grove</h1>
+    <p class="subtitle">Ten wishing sparks are hiding among the trees. Tap each one to gather its light before they drift away.</p>
+    <button class="btn big" onclick="startLevel1()">Enter the Grove</button>
+  </div>
+
+  <!-- LEVEL 1 PLAY -->
+  <div class="screen bg-forest" id="screen-l1-play">
+    <div class="progress"><div class="dot current"></div><div class="dot"></div><div class="dot"></div></div>
+    <div class="badge">Act One &middot; The Whispering Grove</div>
+    <div class="counter">Sparks gathered: <b id="l1-count">0</b> / 10</div>
+    <div class="playfield" id="l1-field"></div>
+    <div class="hint">tap the glowing sparks</div>
+  </div>
+
+  <!-- LEVEL 1 COMPLETE -->
+  <div class="screen bg-forest" id="screen-l1-done">
+    <div class="progress"><div class="dot done"></div><div class="dot current"></div><div class="dot"></div></div>
+    <div class="badge">Grove Cleared</div>
+    <h1 class="title" style="font-size:clamp(22px,6vw,30px)">The Sparks Light the Path</h1>
+    <p class="subtitle">A hidden stairway of crystal glows in the dark, leading down into the mountain.</p>
+    <button class="btn big" onclick="goTo('screen-l2-intro')">Descend into the Cave</button>
+  </div>
+
+  <!-- LEVEL 2 INTRO -->
+  <div class="screen bg-cave" id="screen-l2-intro">
+    <div class="progress"><div class="dot done"></div><div class="dot current"></div><div class="dot"></div></div>
+    <div class="badge">Act Two</div>
+    <h1 class="title" style="font-size:clamp(22px,6vw,30px)">The Crystal Cave</h1>
+    <p class="subtitle">Loose shards tumble from the ceiling. Tap 10 of them mid-air to clear a path deeper into the mountain.</p>
+    <button class="btn big" onclick="startLevel2()">Enter the Cave</button>
+  </div>
+
+  <!-- LEVEL 2 PLAY -->
+  <div class="screen bg-cave" id="screen-l2-play">
+    <div class="progress"><div class="dot done"></div><div class="dot current"></div><div class="dot"></div></div>
+    <div class="badge">Act Two &middot; The Crystal Cave</div>
+    <div class="counter">Shards cleared: <b id="l2-count">0</b> / 10</div>
+    <div class="playfield" id="l2-field"></div>
+    <div class="hint">tap the falling shards</div>
+  </div>
+
+  <!-- LEVEL 2 COMPLETE -->
+  <div class="screen bg-cave" id="screen-l2-done">
+    <div class="progress"><div class="dot done"></div><div class="dot done"></div><div class="dot current"></div></div>
+    <div class="badge">Cave Cleared</div>
+    <h1 class="title" style="font-size:clamp(22px,6vw,30px)">A Warm Light Ahead</h1>
+    <p class="subtitle">The tunnel opens into a vast lair. Something enormous stirs in the dark, curled around an ancient egg.</p>
+    <button class="btn big ember" onclick="goTo('screen-boss-intro')">Face the Guardian</button>
+  </div>
+
+  <!-- BOSS INTRO -->
+  <div class="screen bg-lair" id="screen-boss-intro">
+    <div class="progress"><div class="dot done"></div><div class="dot done"></div><div class="dot current"></div></div>
+    <div class="badge">Final Act</div>
+    <h1 class="title" style="font-size:clamp(22px,6vw,30px)">The Guardian Dragon</h1>
+    <p class="subtitle">Only by proving your courage will the guardian let the egg's secret be known. Tap the dragon to earn its respect!</p>
+    <div style="font-size:70px; margin:6px 0 10px;">🐉</div>
+    <button class="btn big ember" onclick="startBoss()">Begin the Trial</button>
+  </div>
+
+  <!-- BOSS FIGHT -->
+  <div class="screen bg-lair" id="screen-boss-fight">
+    <div class="fire-flash" id="fire-flash"></div>
+    <div class="progress"><div class="dot done"></div><div class="dot done"></div><div class="dot current"></div></div>
+    <div class="badge">Final Act &middot; The Guardian Dragon</div>
+    <div class="dragon-wrap">
+      <div id="dragon" onclick="hitDragon()">🐉</div>
+    </div>
+    <div class="hpbar-wrap"><div id="hpfill"></div></div>
+    <div class="hint" id="boss-hint">tap the dragon</div>
+  </div>
+
+  <!-- REVEAL -->
+  <div class="screen bg-reveal" id="screen-reveal">
+    <div id="confetti-layer" style="position:absolute; inset:0; overflow:hidden; pointer-events:none;"></div>
+    <div class="badge" style="color:var(--pink-light)">The Guardian Bows</div>
+    <div class="egg" id="reveal-egg">🥚</div>
+    <div id="reveal-content" style="opacity:0; transition:opacity .6s ease;">
+      <div class="reveal-text">IT'S A GIRL! 🎀</div>
+      <p class="reveal-sub">The Wyrmwood egg has hatched its secret at last &mdash; a little dragon princess is on her way to join the family.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function goTo(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function makeStars(containerId, count){
+  const c = document.getElementById(containerId);
+  if(!c || c.childElementCount) return;
+  for(let i=0;i<count;i++){
+    const s = document.createElement('div');
+    s.className='star';
+    s.style.left = Math.random()*100+'%';
+    s.style.top = Math.random()*100+'%';
+    s.style.animationDelay = (Math.random()*2.6)+'s';
+    c.appendChild(s);
+  }
+}
+makeStars('stars-start', 40);
+
+/* ---------- LEVEL 1: tap the sparks ---------- */
+let l1count = 0;
+const L1_TOTAL = 10;
+const sparkEmojis = ['✨','🌟','💫'];
+
+function startLevel1(){
+  l1count = 0;
+  document.getElementById('l1-count').textContent = '0';
+  const field = document.getElementById('l1-field');
+  field.innerHTML = '';
+  goTo('screen-l1-play');
+  spawnSpark();
+}
+
+function spawnSpark(){
+  if(l1count >= L1_TOTAL) return;
+  const field = document.getElementById('l1-field');
+  const fw = field.clientWidth, fh = field.clientHeight;
+  const el = document.createElement('div');
+  el.className = 'spark';
+  el.textContent = sparkEmojis[Math.floor(Math.random()*sparkEmojis.length)];
+  const x = Math.random()*(fw-46)+4;
+  const y = Math.random()*(fh-46)+4;
+  el.style.left = x+'px';
+  el.style.top = y+'px';
+  el.style.animationDelay = (Math.random()*1.2)+'s';
+  el.onclick = function(){
+    if(el.classList.contains('pop')) return;
+    el.classList.add('pop');
+    l1count++;
+    document.getElementById('l1-count').textContent = l1count;
+    setTimeout(()=>el.remove(), 280);
+    if(l1count >= L1_TOTAL){
+      setTimeout(()=>goTo('screen-l1-done'), 500);
+    } else {
+      spawnSpark();
+    }
+  };
+  field.appendChild(el);
+}
+
+/* ---------- LEVEL 2: tap the falling shards ---------- */
+let l2count = 0;
+const L2_TOTAL = 10;
+let l2Timer = null;
+const shardEmojis = ['🔹','🔷','💎'];
+
+function startLevel2(){
+  l2count = 0;
+  document.getElementById('l2-count').textContent = '0';
+  const field = document.getElementById('l2-field');
+  field.innerHTML = '';
+  goTo('screen-l2-play');
+  if(l2Timer) clearInterval(l2Timer);
+  l2Timer = setInterval(spawnShard, 750);
+  spawnShard();
+}
+
+function spawnShard(){
+  if(l2count >= L2_TOTAL){ clearInterval(l2Timer); return; }
+  const field = document.getElementById('l2-field');
+  const fw = field.clientWidth, fh = field.clientHeight;
+  const el = document.createElement('div');
+  el.className = 'shard';
+  el.textContent = shardEmojis[Math.floor(Math.random()*shardEmojis.length)];
+  const x = Math.random()*(fw-40)+2;
+  const dur = 3.2 + Math.random()*1.4;
+  el.style.left = x+'px';
+  el.style.top = '-40px';
+  el.style.animationDuration = dur+'s';
+  el.onanimationend = ()=>{ if(el.parentNode) el.remove(); };
+  el.onclick = function(){
+    if(el.classList.contains('pop')) return;
+    el.classList.add('pop');
+    l2count++;
+    document.getElementById('l2-count').textContent = l2count;
+    setTimeout(()=>{ if(el.parentNode) el.remove(); }, 260);
+    if(l2count >= L2_TOTAL){
+      clearInterval(l2Timer);
+      setTimeout(()=>goTo('screen-l2-done'), 500);
+    }
+  };
+  field.appendChild(el);
+}
+
+/* ---------- BOSS FIGHT ---------- */
+let bossHP = 20;
+const BOSS_MAX = 20;
+
+function startBoss(){
+  bossHP = BOSS_MAX;
+  document.getElementById('hpfill').style.width = '100%';
+  document.getElementById('boss-hint').textContent = 'tap the dragon';
+  goTo('screen-boss-fight');
+}
+
+function hitDragon(){
+  if(bossHP <= 0) return;
+  bossHP = Math.max(0, bossHP-1);
+  const pct = (bossHP/BOSS_MAX*100);
+  document.getElementById('hpfill').style.width = pct+'%';
+  const d = document.getElementById('dragon');
+  d.classList.remove('hit'); void d.offsetWidth; d.classList.add('hit');
+  setTimeout(()=>d.classList.remove('hit'), 100);
+
+  if(Math.random() < 0.18){
+    const flash = document.getElementById('fire-flash');
+    flash.style.background = 'rgba(255,90,40,0.35)';
+    setTimeout(()=>flash.style.background='rgba(255,90,40,0)', 140);
+  }
+
+  if(bossHP <= 5 && bossHP > 0){
+    document.getElementById('boss-hint').textContent = 'almost there!';
+  }
+  if(bossHP === 0){
+    document.getElementById('boss-hint').textContent = 'the guardian bows...';
+    setTimeout(showReveal, 900);
+  }
+}
+
+/* ---------- REVEAL ---------- */
+function showReveal(){
+  goTo('screen-reveal');
+  const egg = document.getElementById('reveal-egg');
+  setTimeout(()=>{
+    egg.classList.add('shake');
+    setTimeout(()=>{
+      egg.textContent = '🎀';
+      egg.style.transform = 'scale(1.15)';
+      document.getElementById('reveal-content').style.opacity = '1';
+      launchConfetti();
+    }, 550);
+  }, 400);
+}
+
+function launchConfetti(){
+  const layer = document.getElementById('confetti-layer');
+  const colors = ['#ff8fb3','#ffd6e4','#e8c874','#ffffff','#ff6b9d'];
+  for(let i=0;i<90;i++){
+    const p = document.createElement('div');
+    p.className = 'confetti';
+    p.style.left = Math.random()*100+'%';
+    p.style.background = colors[Math.floor(Math.random()*colors.length)];
+    p.style.animationDuration = (2.6+Math.random()*2.2)+'s';
+    p.style.animationDelay = (Math.random()*1.6)+'s';
+    p.style.borderRadius = Math.random()>0.5 ? '50%' : '2px';
+    layer.appendChild(p);
+  }
+  setInterval(()=>{
+    if(document.getElementById('screen-reveal').classList.contains('active')){
+      const p = document.createElement('div');
+      p.className = 'confetti';
+      p.style.left = Math.random()*100+'%';
+      p.style.background = colors[Math.floor(Math.random()*colors.length)];
+      p.style.animationDuration = (2.6+Math.random()*2.2)+'s';
+      p.style.borderRadius = Math.random()>0.5 ? '50%' : '2px';
+      layer.appendChild(p);
+      setTimeout(()=>p.remove(), 5200);
+    }
+  }, 350);
+}
+</script>
+</body>
+</html>
